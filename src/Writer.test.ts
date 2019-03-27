@@ -3,16 +3,11 @@ import * as IORedis from 'ioredis'
 import * as uuid from 'uuid'
 
 import { Writer } from './Writer'
-import { Emitter } from './types'
+import { on } from './util'
 
 type Shape = {
   a: number
 }
-
-const on = (emitter: Emitter, eventName: string) =>
-  new Promise(resolve => {
-    emitter.on(eventName, resolve)
-  })
 
 const id = () => uuid.v4()
 
