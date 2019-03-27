@@ -1,0 +1,4 @@
+--exit
+--require ts-node/register
+--require chai-autoload-plugins
+--watch-extensions ts

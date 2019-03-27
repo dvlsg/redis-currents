@@ -1,0 +1,16 @@
+{
+  "extends": ["tslint:latest", "tslint-consistent-codestyle", "tslint-config-prettier"],
+  "rules": {
+    "no-implicit-dependencies": [true, "dev"],
+    "object-literal-sort-keys": false,
+    "no-this-assignment": [true, { "allow-destructuring": true }],
+    "interface-name": [true, "never-prefix"],
+    "ordered-imports": [false],
+    "early-exit": true,
+    "no-unnecessary-else": true,
+    "no-unused": true,
+    "interface-over-type-literal": false,
+    "unified-signatures": false,
+    "no-submodule-imports": false
+  }
+}

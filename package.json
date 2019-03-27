@@ -2,8 +2,33 @@
   "name": "redis-currents",
   "version": "0.1.0",
   "description": "Utilities for directing and interacting with redis streams",
-  "main": "index.js",
+  "main": "dist/index.js",
   "repository": "https://github.com/dvlsg/redis-currents.git",
   "author": "dvlsg <dlesage27@gmail.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "lint": "tslint --project .",
+    "test": "mocha ./src/**/*.test.ts"
+  },
+  "dependencies": {
+    "ioredis": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/chai": "^4.1.7",
+    "@types/ioredis": "^4.0.10",
+    "@types/mocha": "^5.2.6",
+    "@types/redis": "^2.8.11",
+    "@types/uuid": "^3.4.4",
+    "chai": "^4.2.0",
+    "chai-autoload-plugins": "^0.1.0",
+    "mocha": "^6.0.2",
+    "nyc": "^13.3.0",
+    "prettier": "^1.16.4",
+    "ts-node": "^8.0.3",
+    "tslint": "^5.14.0",
+    "tslint-config-prettier": "^1.18.0",
+    "tslint-consistent-codestyle": "^1.15.1",
+    "typescript": "^3.3.3333",
+    "uuid": "^3.3.2"
+  }
 }
