@@ -59,6 +59,11 @@ class Consumer<T = any> {
     return this.client.on(name, callback)
   }
 
+  public async ack(id: string) {
+    const result = await this.client.xack(this.stream, this.group, id)
+    return result
+  }
+
   private async _ensureGroup() {
     try {
       await this.client.xgroup('CREATE', this.stream, this.group, this.from, 'MKSTREAM')
@@ -98,11 +103,6 @@ class Consumer<T = any> {
     return mapped
   }
 
-  private async _ack(id: string) {
-    const result = await this.client.xack(this.stream, this.group, id)
-    return result
-  }
-
   private async *_iterate() {
     await this._ensureGroup()
     while (true) {
@@ -116,8 +116,8 @@ class Consumer<T = any> {
       }
       for (const [id, serialized] of items) {
         const data = deserialize<T>(serialized)
-        yield data
-        await this._ack(id)
+        const tuple: [string, T] = [id, data]
+        yield tuple
       }
     }
   }

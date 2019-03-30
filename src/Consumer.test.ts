@@ -86,8 +86,9 @@ describe('Consumer', function() {
 
       let reading = 0
       const consumed: Shape[] = []
-      for await (const data of consumer) {
+      for await (const [id, data] of consumer) {
         consumed.push(data)
+        await consumer.ack(id)
         if (++reading === writes) {
           break
         }
@@ -101,8 +102,9 @@ describe('Consumer', function() {
       const { consumer } = open({ stream })
       const consumed: Shape[] = []
       ;(async () => {
-        for await (const data of consumer) {
+        for await (const [id, data] of consumer) {
           consumed.push(data)
+          await consumer.ack(id)
         }
       })()
       await sleep(100)
@@ -125,8 +127,9 @@ describe('Consumer', function() {
       const writes = 15
       let reading = 0
       const reads = (async () => {
-        for await (const data of consumer) {
+        for await (const [id, data] of consumer) {
           consumed.push(data)
+          await consumer.ack(id)
           if (++reading === writes) {
             break
           }
@@ -148,8 +151,9 @@ describe('Consumer', function() {
       const consumed: Shape[] = []
       const reader = () =>
         (async () => {
-          for await (const data of consumer) {
+          for await (const [id, data] of consumer) {
             consumed.push(data)
+            await consumer.ack(id)
           }
         })()
 
@@ -163,7 +167,7 @@ describe('Consumer', function() {
       assert.deepEqual(consumed, expected)
     })
 
-    it('should redeliver unacked items for a consumer', async () => {
+    it('should redeliver unacked items for a newly connected consumer with the same group name', async () => {
       const stream = uuid()
       const consumer = uuid()
       const group = uuid()
@@ -178,12 +182,13 @@ describe('Consumer', function() {
 
       const consumed: Shape[] = []
       let consumedCount = 0
-      for await (const data of consumer1) {
+      for await (const [id, data] of consumer1) {
         consumed.push(data)
         consumedCount += 1
         if (consumedCount === 2) {
           break
         }
+        await consumer1.ack(id)
       }
 
       const pending = await redis.xpending(stream, group)
@@ -194,9 +199,10 @@ describe('Consumer', function() {
       assert.strictEqual(unacked, 4)
 
       const { consumer: consumer2 } = open(opts)
-      for await (const data of consumer2) {
+      for await (const [id, data] of consumer2) {
         consumed.push(data)
         consumedCount += 1
+        await consumer2.ack(id)
         if (consumedCount === 6) {
           break
         }
