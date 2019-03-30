@@ -3,6 +3,18 @@ import * as IORedis from 'ioredis'
 import { deserialize } from './serialization'
 import { listener } from './types'
 
+type Pending = {
+  stream: string
+  group: string
+  consumer: string
+  id: string
+  created: Date
+  waiting: number
+  deliveries: number
+}
+
+type PendingTuple = [string, string, number, number]
+
 type ConsumerOptions = {
   block?: number
   count?: number
@@ -22,6 +34,12 @@ const doneWithBacklog = <T>(items: T[]) => {
 const isGroupAlreadyExistsError = (err: Error) => {
   return err.message.startsWith('BUSYGROUP')
 }
+
+const isNoGroupExistsError = (err: Error) => {
+  return err.message.startsWith('NOGROUP')
+}
+
+const idToDate = (id: string) => new Date(Number(id.split('-')[0]))
 
 class Consumer<T = any> {
   private readonly client: IORedis.Redis
@@ -62,6 +80,25 @@ class Consumer<T = any> {
   public async ack(id: string) {
     const result = await this.client.xack(this.stream, this.group, id)
     return result
+  }
+
+  public async pending(start = '-', end = '+', length = 100): Promise<Pending[]> {
+    try {
+      const { stream, group } = this
+      const pendingTuples: PendingTuple[] = await this.client.xpending(stream, group, start, end, length)
+      const pendingObjects = pendingTuples.map(tuple => {
+        const [id, consumer, waiting, deliveries] = tuple
+        const created = idToDate(id)
+        const pending = { id, consumer, created, stream, group, deliveries, waiting }
+        return pending
+      })
+      return pendingObjects
+    } catch (err) {
+      if (!isNoGroupExistsError(err)) {
+        throw err
+      }
+      return []
+    }
   }
 
   private async _ensureGroup() {

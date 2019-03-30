@@ -73,6 +73,69 @@ describe('Consumer', function() {
     })
   })
 
+  describe('#pending()', () => {
+    it('should have an empty response when calling pending on a group that does not exist yet', async () => {
+      const { consumer } = open()
+      const pending = await consumer.pending()
+      assert.deepEqual(pending, [])
+    })
+
+    it('should have an empty response when no unacked messages are pending', async () => {
+      const { writer, consumer } = open()
+      await writer.write({ a: 1 })
+      const {
+        value: [id],
+      } = await consumer[Symbol.asyncIterator]().next()
+      await consumer.ack(id)
+      const pending = await consumer.pending()
+      assert.deepEqual(pending, [])
+    })
+
+    it('should not consider written messages to be pending unless they have been delivered to a consumer', async () => {
+      const { writer, consumer } = open()
+      await writer.write({ a: 1 })
+      const pending = await consumer.pending()
+      assert.deepEqual(pending, [])
+    })
+
+    it('should return a list of pending but unacked messages', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const count = 3
+      const { writer, consumer: consumer1 } = open({ stream, group, count, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, count, consumer: consumerName2 })
+      const { consumer: consumer2Again } = open({ stream, group, count, consumer: consumerName2 })
+      for (const a of fill(5)) {
+        await writer.write({ a })
+      }
+      await consumer1[Symbol.asyncIterator]().next()
+      await consumer2[Symbol.asyncIterator]().next()
+      await consumer2Again[Symbol.asyncIterator]().next()
+      const pending = await consumer1.pending()
+      assert.containSubset(pending, [
+        ...fill(3).map(_ => ({
+          consumer: consumerName1,
+          deliveries: 1,
+          group,
+          stream,
+        })),
+        ...fill(2).map(_ => ({
+          consumer: consumerName2,
+          deliveries: 2,
+          group,
+          stream,
+        })),
+      ])
+      for (const entry of pending) {
+        assert.isString(entry.id)
+        assert.instanceOf(entry.created, Date)
+        assert.isAtLeast(entry.waiting, 0)
+      }
+    })
+  })
+
   describe('[Symbol.asyncIterator]()', () => {
     it('should allow us to treat the Consumer as directly iterable', async () => {
       const { consumer, writer } = open()
@@ -191,9 +254,9 @@ describe('Consumer', function() {
         await consumer1.ack(id)
       }
 
-      const pending = await redis.xpending(stream, group)
-      const consumers = pending[3]
-      const unacked = Number(consumers.find((c: any) => c[0] === consumer)[1])
+      const pending = await consumer1.pending()
+      const pendingForConsumer = pending.filter(p => p.consumer === opts.consumer)
+      const unacked = pendingForConsumer.length
 
       assert.strictEqual(consumed.length, 2)
       assert.strictEqual(unacked, 4)
