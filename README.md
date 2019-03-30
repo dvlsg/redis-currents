@@ -20,10 +20,11 @@ write()
 import { Consumer } from 'redis-currents'
 const consumer = new Consumer('redis://localhost:6379', 'stream_name', 'group_1', 'consumer_1')
 const read = async () => {
-  for await (const event of consumer) {
-    console.log(event)
+  for await (const [id, msg] of consumer) {
+    console.log(msg)
     //=> { data: 1 }
     //=> { data: 3 }
+    await consumer.ack(id)
   }
 }
 read()
@@ -34,10 +35,11 @@ read()
 import { Consumer } from 'redis-currents'
 const consumer = new Consumer('redis://localhost:6379', 'stream_name', 'group_1', 'consumer_2')
 const read = async () => {
-  for await (const event of consumer) {
-    console.log(event)
+  for await (const [id, msg] of consumer) {
+    console.log(msg)
     //=> { data: 2 }
     //=> { data: 4 }
+    await consumer.ack(id)
   }
 }
 read()
@@ -48,12 +50,13 @@ read()
 import { Consumer } from 'redis-currents'
 const consumer = new Consumer('redis://localhost:6379', 'stream_name', 'group_2', 'consumer_1')
 const read = async () => {
-  for await (const event of consumer) {
-    console.log(event)
+  for await (const [id, msg] of consumer) {
+    console.log(msg)
     //=> { data: 1 }
     //=> { data: 2 }
     //=> { data: 3 }
     //=> { data: 4 }
+    await consumer.ack(id)
   }
 }
 read()
