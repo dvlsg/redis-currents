@@ -4,4 +4,6 @@ type Emitter = {
   on(eventName: string, callback: listener): void
 }
 
-export { listener, Emitter }
+type Id = string
+
+export { listener, Emitter, Id }

@@ -1,7 +1,7 @@
 import * as IORedis from 'ioredis'
 
 import { serialize } from './serialization'
-import { listener } from './types'
+import { Id, listener } from './types'
 
 type WriterOptions = {
   maxLength?: number
@@ -26,8 +26,8 @@ class Writer<T = any> {
 
   public async write(data: T): Promise<string> {
     const serialized = serialize(data)
-    const key = await this.client.xadd(this.stream, 'MAXLEN', '~', this.maxLength, '*', 'data', serialized)
-    return key as string
+    const id = await this.client.xadd(this.stream, 'MAXLEN', '~', this.maxLength, '*', 'd', serialized)
+    return id as Id
   }
 
   public on(eventName: string, callback: listener): void {

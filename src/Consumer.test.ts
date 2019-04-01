@@ -21,6 +21,11 @@ type Shape = {
   a: number
 }
 
+const step = <T>(consumer: Consumer<T>) =>
+  consumer[Symbol.asyncIterator]()
+    .next()
+    .then(({ value }) => value)
+
 describe('Consumer', function() {
   this.timeout(5000)
   const uri = 'redis://localhost:6379'
@@ -83,9 +88,7 @@ describe('Consumer', function() {
     it('should have an empty response when no unacked messages are pending', async () => {
       const { writer, consumer } = open()
       await writer.write({ a: 1 })
-      const {
-        value: [id],
-      } = await consumer[Symbol.asyncIterator]().next()
+      const [id] = await step(consumer)
       await consumer.ack(id)
       const pending = await consumer.pending()
       assert.deepEqual(pending, [])
@@ -110,9 +113,9 @@ describe('Consumer', function() {
       for (const a of fill(5)) {
         await writer.write({ a })
       }
-      await consumer1[Symbol.asyncIterator]().next()
-      await consumer2[Symbol.asyncIterator]().next()
-      await consumer2Again[Symbol.asyncIterator]().next()
+      await step(consumer1)
+      await step(consumer2)
+      await step(consumer2Again)
       const pending = await consumer1.pending()
       assert.containSubset(pending, [
         ...fill(3).map(_ => ({
@@ -133,6 +136,40 @@ describe('Consumer', function() {
         assert.instanceOf(entry.created, Date)
         assert.isAtLeast(entry.waiting, 0)
       }
+    })
+  })
+
+  describe('#claim()', () => {
+    it('should claim a list of unacked messages by their ids', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, consumer: consumerName2 })
+      for (const a of fill(5)) {
+        await writer.write({ a })
+      }
+      await step(consumer1)
+      const pendingBefore = await consumer2.pending()
+      assert.containSubset(pendingBefore, [
+        {
+          consumer: consumerName1,
+          deliveries: 1,
+        },
+      ])
+      const ids = pendingBefore.filter(p => p.consumer !== consumerName2).map(p => p.id)
+      const claimed = await consumer2.claim(ids)
+      const pendingAfter = await consumer2.pending()
+      assert.containSubset(pendingAfter, [
+        {
+          consumer: consumerName2,
+          deliveries: 1,
+        },
+      ])
+      assert.deepEqual(pendingBefore[0].created, pendingAfter[0].created)
+      const value = await step(consumer2)
+      assert.deepEqual(claimed[0], value)
     })
   })
 

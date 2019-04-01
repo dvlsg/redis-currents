@@ -1,19 +1,21 @@
 import * as IORedis from 'ioredis'
 
 import { deserialize } from './serialization'
-import { listener } from './types'
+import { Id, listener } from './types'
 
 type Pending = {
   stream: string
   group: string
   consumer: string
-  id: string
+  id: Id
   created: Date
   waiting: number
   deliveries: number
 }
 
-type PendingTuple = [string, string, number, number]
+type PendingTuple = [Id, string, number, number]
+type SerializedPair = [Id, [never, string]]
+type DeserializedPair<T> = [Id, T]
 
 type ConsumerOptions = {
   block?: number
@@ -39,7 +41,15 @@ const isNoGroupExistsError = (err: Error) => {
   return err.message.startsWith('NOGROUP')
 }
 
-const idToDate = (id: string) => new Date(Number(id.split('-')[0]))
+const idToDate = (id: Id) => new Date(Number(id.split('-')[0]))
+
+const deserializePair = <T>(pair: SerializedPair) => {
+  const [id, arr] = pair
+  const [, serialized] = arr
+  const data = deserialize<T>(serialized)
+  const paired: DeserializedPair<T> = [id, data]
+  return paired
+}
 
 class Consumer<T = any> {
   private readonly client: IORedis.Redis
@@ -77,7 +87,7 @@ class Consumer<T = any> {
     return this.client.on(name, callback)
   }
 
-  public async ack(id: string) {
+  public async ack(id: Id) {
     const result = await this.client.xack(this.stream, this.group, id)
     return result
   }
@@ -101,6 +111,19 @@ class Consumer<T = any> {
     }
   }
 
+  public async claim(ids: Id[]) {
+    const MIN_IDLE_TIME = 0
+    const pairs: SerializedPair[] = await this.client.xclaim(
+      this.stream,
+      this.group,
+      this.consumer,
+      MIN_IDLE_TIME,
+      ...ids,
+    )
+    const mapped = pairs.map(pair => deserializePair<T>(pair))
+    return mapped
+  }
+
   private async _ensureGroup() {
     try {
       await this.client.xgroup('CREATE', this.stream, this.group, this.from, 'MKSTREAM')
@@ -111,7 +134,7 @@ class Consumer<T = any> {
     }
   }
 
-  private async _read(fromId: string) {
+  private async _read(fromId: Id) {
     const result = await this.client.xreadgroup(
       'GROUP',
       this.group,
@@ -127,16 +150,8 @@ class Consumer<T = any> {
     if (!result) {
       return null
     }
-    const items = result[0][1] as Item[]
-
-    type Item = [string, [string, string]]
-
-    const mapped = items.map((item: Item) => {
-      const [id, arr] = item
-      const [, serialized] = arr
-      const paired: [string, string] = [id, serialized]
-      return paired
-    })
+    const pairs = result[0][1] as SerializedPair[]
+    const mapped = pairs.map(pair => deserializePair<T>(pair))
     return mapped
   }
 
@@ -144,17 +159,15 @@ class Consumer<T = any> {
     await this._ensureGroup()
     while (true) {
       const fromId = this.checkBacklog ? '0-0' : '>'
-      const items = await this._read(fromId)
-      if (!items) {
+      const pairs = await this._read(fromId)
+      if (!pairs) {
         continue
       }
-      if (doneWithBacklog(items)) {
+      if (doneWithBacklog(pairs)) {
         this.checkBacklog = false
       }
-      for (const [id, serialized] of items) {
-        const data = deserialize<T>(serialized)
-        const tuple: [string, T] = [id, data]
-        yield tuple
+      for (const pair of pairs) {
+        yield pair
       }
     }
   }
