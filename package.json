@@ -3,13 +3,19 @@
   "version": "0.1.0",
   "description": "Utilities for directing and interacting with redis streams",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/dvlsg/redis-currents.git",
   "author": "dvlsg <dlesage27@gmail.com>",
   "license": "MIT",
   "scripts": {
+    "build": "tsc",
     "lint": "tslint --project .",
-    "test": "mocha ./src/**/*.test.ts"
+    "test": "mocha \"./{,!(node_modules)/**/}*.test.ts\""
   },
+  "files": [
+    "dist",
+    "!dist/**/*.test.*"
+  ],
   "dependencies": {
     "ioredis": "^4.9.0"
   },
