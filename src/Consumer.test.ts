@@ -311,4 +311,32 @@ describe('Consumer', function() {
       assert.deepEqual(consumed, expected)
     })
   })
+
+  describe('#ack()', () => {
+    it('should acknowledge a delivered id', async () => {
+      const { writer, consumer } = open()
+      writer.write({ a: 1 })
+      writer.write({ a: 2 })
+      const [id] = await step(consumer)
+      const pendingBefore = await consumer.pending()
+      assert.containSubset(pendingBefore, [{ id }])
+      await consumer.ack(id)
+      const pendingAfter = await consumer.pending()
+      assert.deepEqual(pendingAfter, [])
+    })
+
+    it('should not error when called before stream or consumer group exists', async () => {
+      const { consumer } = open()
+      await consumer.ack('invalid-id')
+    })
+
+    it('should throw an error when given an invalid id on an initialized stream / group', async () => {
+      const { writer, consumer } = open()
+      writer.write({ a: 1 })
+      await step(consumer)
+      const error = await consumer.ack('invalid-id').catch(e => e)
+      assert.instanceOf(error, Error)
+      assert.match(error.message, /invalid stream id/gi)
+    })
+  })
 })

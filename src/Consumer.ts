@@ -88,8 +88,7 @@ class Consumer<T = any> {
   }
 
   public async ack(id: Id) {
-    const result = await this.client.xack(this.stream, this.group, id)
-    return result
+    await this.client.xack(this.stream, this.group, id)
   }
 
   public async pending(start = '-', end = '+', length = 100): Promise<Pending[]> {
