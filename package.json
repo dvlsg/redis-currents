@@ -10,7 +10,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "tslint --project .",
-    "test": "mocha \"./{,!(node_modules)/**/}*.test.ts\""
+    "test": "mocha \"./{,!(node_modules)/**/}*.test.ts\"",
+    "example:groups": "ts-node ./examples/groups.ts"
   },
   "files": [
     "dist",
