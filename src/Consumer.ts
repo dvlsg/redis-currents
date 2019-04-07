@@ -41,6 +41,10 @@ const isNoGroupExistsError = (err: Error) => {
   return err.message.startsWith('NOGROUP')
 }
 
+const isConnectionClosedError = (err: Error) => {
+  return err.message === 'Connection is closed.'
+}
+
 const idToDate = (id: Id) => new Date(Number(id.split('-')[0]))
 
 const deserializePair = <T>(pair: SerializedPair) => {
@@ -56,7 +60,9 @@ class Consumer<T = any> {
   private readonly block: number
   private readonly count: number
   private readonly from: string
+  private running: boolean = true
   private checkBacklog: boolean = true
+  private reading: boolean = false
 
   constructor(client: IORedis.Redis, stream: string, group: string, consumer: string)
   constructor(client: IORedis.Redis, stream: string, group: string, consumer: string, opts: ConsumerOptions)
@@ -81,6 +87,13 @@ class Consumer<T = any> {
 
   public disconnect() {
     this.client.disconnect()
+  }
+
+  public shutdown() {
+    this.running = false
+    if (this.reading && this.block === 0) {
+      this.disconnect()
+    }
   }
 
   public on(name: string, callback: listener) {
@@ -134,29 +147,39 @@ class Consumer<T = any> {
   }
 
   private async _read(fromId: Id) {
-    const result = await this.client.xreadgroup(
-      'GROUP',
-      this.group,
-      this.consumer,
-      'BLOCK',
-      this.block,
-      'COUNT',
-      this.count,
-      'STREAMS',
-      this.stream,
-      fromId,
-    )
-    if (!result) {
-      return null
+    try {
+      this.reading = true
+      const result = await this.client.xreadgroup(
+        'GROUP',
+        this.group,
+        this.consumer,
+        'BLOCK',
+        this.block,
+        'COUNT',
+        this.count,
+        'STREAMS',
+        this.stream,
+        fromId,
+      )
+      if (!result) {
+        return null
+      }
+      const pairs = result[0][1] as SerializedPair[]
+      const mapped = pairs.map(pair => deserializePair<T>(pair))
+      return mapped
+    } catch (err) {
+      if (isConnectionClosedError(err) && !this.running) {
+        return null
+      }
+      throw err
+    } finally {
+      this.reading = false
     }
-    const pairs = result[0][1] as SerializedPair[]
-    const mapped = pairs.map(pair => deserializePair<T>(pair))
-    return mapped
   }
 
   private async *_iterate() {
     await this._ensureGroup()
-    while (true) {
+    while (this.running) {
       const fromId = this.checkBacklog ? '0-0' : '>'
       const pairs = await this._read(fromId)
       if (!pairs) {
@@ -169,6 +192,7 @@ class Consumer<T = any> {
         yield pair
       }
     }
+    this.disconnect()
   }
 }
 

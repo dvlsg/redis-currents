@@ -315,8 +315,8 @@ describe('Consumer', function() {
   describe('#ack()', () => {
     it('should acknowledge a delivered id', async () => {
       const { writer, consumer } = open()
-      writer.write({ a: 1 })
-      writer.write({ a: 2 })
+      await writer.write({ a: 1 })
+      await writer.write({ a: 2 })
       const [id] = await step(consumer)
       const pendingBefore = await consumer.pending()
       assert.containSubset(pendingBefore, [{ id }])
@@ -332,11 +332,40 @@ describe('Consumer', function() {
 
     it('should throw an error when given an invalid id on an initialized stream / group', async () => {
       const { writer, consumer } = open()
-      writer.write({ a: 1 })
+      await writer.write({ a: 1 })
       await step(consumer)
       const error = await consumer.ack('invalid-id').catch(e => e)
       assert.instanceOf(error, Error)
       assert.match(error.message, /invalid stream id/gi)
+    })
+  })
+
+  describe('#shutdown()', () => {
+    it('should break the consumer loop even on infinite blocks', async () => {
+      const { writer, consumer } = open({ block: 0 })
+      await writer.write({ a: 1 })
+      for await (const [id, data] of consumer) {
+        assert.notStrictEqual(data.a, 2)
+        await consumer.ack(id)
+        await writer.write({ a: 2 })
+        consumer.shutdown()
+      }
+    })
+
+    it('should continue consuming a delivered block when using a delivery count', async () => {
+      const { writer, consumer } = open({ block: 0, count: 3 })
+      await writer.write({ a: 1 })
+      await writer.write({ a: 2 })
+      await writer.write({ a: 3 })
+      const consumed: Shape[] = []
+      for await (const [id, data] of consumer) {
+        if (data.a === 1) {
+          consumer.shutdown()
+        }
+        consumed.push(data)
+        await consumer.ack(id)
+      }
+      assert.deepEqual(consumed, [{ a: 1 }, { a: 2 }, { a: 3 }])
     })
   })
 })
