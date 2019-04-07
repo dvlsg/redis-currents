@@ -11,7 +11,8 @@
     "build": "tsc",
     "lint": "tslint --project .",
     "test": "mocha \"./{,!(node_modules)/**/}*.test.ts\"",
-    "example:groups": "ts-node ./examples/groups.ts"
+    "example:groups": "ts-node ./examples/groups.ts",
+    "example:safe-exit": "ts-node ./examples/safe-exit/index.ts"
   },
   "files": [
     "dist",
