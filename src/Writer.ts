@@ -33,6 +33,10 @@ class Writer<T = any> {
   public on(eventName: string, callback: listener): void {
     this.client.on(eventName, callback)
   }
+
+  public disconnect() {
+    this.client.disconnect()
+  }
 }
 
 export default Writer
