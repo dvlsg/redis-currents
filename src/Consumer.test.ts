@@ -368,4 +368,73 @@ describe('Consumer', function() {
       assert.deepEqual(consumed, [{ a: 1 }, { a: 2 }, { a: 3 }])
     })
   })
+
+  describe('#deleteConsumer()', () => {
+    const checkInfo = async (stream: string, expectedGroup: string, expectedConsumerCount: number) => {
+      let info
+      try {
+        info = await redis.xinfo('GROUPS', stream)
+      } catch (err) {
+        if (err.message !== 'ERR no such key' || expectedConsumerCount !== 0) {
+          throw err
+        }
+      }
+      if (info && info.length > 0) {
+        assert.strictEqual(info[0][1], expectedGroup)
+        assert.strictEqual(info[0][3], expectedConsumerCount)
+      } else {
+        assert.strictEqual(0, expectedConsumerCount)
+      }
+    }
+
+    it('should remove the reference to the consumer from the group', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const { writer, consumer } = open({ stream, group, block: 0 })
+      await checkInfo(stream, group, 0)
+      await writer.write({ a: 1 })
+      await checkInfo(stream, group, 0)
+      await step(consumer)
+      await checkInfo(stream, group, 1)
+      await consumer.deleteConsumer()
+      await checkInfo(stream, group, 0)
+    })
+
+    it('should only remove the reference of the current consumer from the group', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, block: 0 })
+      const { consumer: consumer2 } = open({ stream, group, block: 0 })
+      await checkInfo(stream, group, 0)
+      await writer.write({ a: 1 })
+      await writer.write({ a: 2 })
+      await checkInfo(stream, group, 0)
+      await step(consumer1)
+      await checkInfo(stream, group, 1)
+      await step(consumer2)
+      await checkInfo(stream, group, 2)
+      await consumer1.deleteConsumer()
+      await checkInfo(stream, group, 1)
+      await consumer2.deleteConsumer()
+      await checkInfo(stream, group, 0)
+    })
+
+    it('will remove unacked / unclaimed messages when deleting a consumer', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, block: 0, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, block: 0, consumer: consumerName2 })
+      await writer.write({ a: 1 })
+      await writer.write({ a: 2 })
+      await step(consumer1)
+      const pendingBefore = await consumer2.pending()
+      assert.lengthOf(pendingBefore, 1)
+      assert.containSubset(pendingBefore[0], { stream, group, consumer: consumerName1, deliveries: 1 })
+      await consumer1.deleteConsumer()
+      const pendingAfter = await consumer2.pending()
+      assert.lengthOf(pendingAfter, 0)
+    })
+  })
 })

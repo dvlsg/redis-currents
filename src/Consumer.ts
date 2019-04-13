@@ -136,6 +136,10 @@ class Consumer<T = any> {
     return mapped
   }
 
+  public async deleteConsumer() {
+    await this.client.xgroup('DELCONSUMER', this.stream, this.group, this.consumer)
+  }
+
   private async _ensureGroup() {
     try {
       await this.client.xgroup('CREATE', this.stream, this.group, this.from, 'MKSTREAM')
