@@ -9,6 +9,7 @@
   "license": "MIT",
   "scripts": {
     "build": "tsc",
+    "build:docs": "typedoc --mode file --out docs --excludeExternals --includeDeclarations ./src",
     "lint": "tslint --project .",
     "prepublishOnly": "yarn lint && yarn test && yarn build",
     "preversion": "yarn lint && yarn test",
@@ -45,6 +46,7 @@
     "tslint": "^5.14.0",
     "tslint-config-prettier": "^1.18.0",
     "tslint-consistent-codestyle": "^1.15.1",
+    "typedoc": "^0.14.2",
     "typescript": "^3.3.3333",
     "uuid": "^3.3.2"
   }
