@@ -93,3 +93,7 @@ Examples in `redis-currents` can be found at `./examples`, and run from the term
 yarn example:safe-exit
 yarn example:groups
 ```
+
+### API
+
+Docs generated with [TypeDoc](https://typedoc.org/) can be found at https://dvlsg.github.io/redis-currents/
