@@ -61,3 +61,35 @@ const read = async () => {
 }
 read()
 ```
+
+## Getting Started
+
+### Requirements
+
+- Redis 5, for access to [streams](https://redis.io/topics/streams-intro).
+- Node 10+, for access to [async iterables](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Statements/for-await...of).
+
+### Installation
+
+```sh
+yarn add redis-currents
+```
+
+### Tests
+
+Tests in `redis-currents` by default will assume that you have an instance of redis running locally on port `6379`.
+You can override this by providing `TEST_REDIS_URI` as an environment variable.
+
+```sh
+# run all tests
+yarn test
+```
+
+### Examples
+
+Examples in `redis-currents` can be found at `./examples`, and run from the terminal.
+
+```sh
+yarn example:safe-exit
+yarn example:groups
+```

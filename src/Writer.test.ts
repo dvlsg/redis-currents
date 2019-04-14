@@ -13,11 +13,7 @@ const id = () => uuid.v4()
 
 describe('writer', function() {
   this.timeout(5000)
-  const uri = 'redis://localhost:6379'
-  const redis = new IORedis(uri)
-  const flush = redis.flushall.bind(redis)
-
-  afterEach(flush)
+  const uri = process.env.TEST_REDIS_URI || 'redis://localhost:6379'
 
   describe('ctor', () => {
     it('should create a writer from a uri', async () => {

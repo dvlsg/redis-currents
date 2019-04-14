@@ -28,11 +28,9 @@ const step = <T>(consumer: Consumer<T>) =>
 
 describe('Consumer', function() {
   this.timeout(5000)
-  const uri = 'redis://localhost:6379'
-  const redis = new IORedis(uri)
-  const flush = redis.flushall.bind(redis)
 
-  afterEach(flush)
+  const uri = process.env.TEST_REDIS_URI || 'redis://localhost:6379'
+  const redis = new IORedis(uri)
 
   const open = (
     opts: OpenOptions = {
