@@ -10,10 +10,17 @@
   "scripts": {
     "build": "tsc",
     "lint": "tslint --project .",
+    "prepublishOnly": "yarn lint && yarn test && yarn build",
+    "preversion": "yarn lint && yarn test",
     "test": "mocha \"./{,!(node_modules)/**/}*.test.ts\"",
     "example:groups": "ts-node ./examples/groups.ts",
     "example:safe-exit": "ts-node ./examples/safe-exit/index.ts"
   },
+  "keywords": [
+    "redis",
+    "streams",
+    "consumer"
+  ],
   "files": [
     "dist",
     "!dist/**/*.test.*"
