@@ -1,4 +1,4 @@
-import { Consumer } from './Consumer'
-import { Writer } from './Writer'
+import { Consumer, ConsumerOptions } from './Consumer'
+import { Writer, WriterOptions } from './Writer'
 
-export { Consumer, Writer }
+export { Consumer, ConsumerOptions, Writer, WriterOptions }

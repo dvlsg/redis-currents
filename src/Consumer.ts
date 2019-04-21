@@ -201,4 +201,4 @@ class Consumer<T = any> {
 }
 
 export default Consumer
-export { Consumer }
+export { Consumer, ConsumerOptions }

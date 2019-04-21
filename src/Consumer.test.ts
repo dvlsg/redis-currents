@@ -2,8 +2,8 @@ import { assert } from 'chai'
 import * as uuid from 'uuid/v4'
 import * as IORedis from 'ioredis'
 
-import Consumer from './Consumer'
-import Writer from './Writer'
+import { Consumer } from './Consumer'
+import { Writer } from './Writer'
 
 import { on, sleep, fill } from './util'
 
