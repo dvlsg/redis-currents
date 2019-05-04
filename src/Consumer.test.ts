@@ -169,6 +169,112 @@ describe('Consumer', function() {
       const value = await step(consumer2)
       assert.deepEqual(claimed[0], value)
     })
+
+    it('should redeliver claimed messages only to the claiming consumer', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const consumerName3 = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, consumer: consumerName2 })
+      const { consumer: consumer3 } = open({ stream, group, consumer: consumerName3 })
+      for (const a of fill(5)) {
+        await writer.write({ a })
+      }
+      await step(consumer1)
+      const pendingBefore = await consumer2.pending()
+      assert.containSubset(pendingBefore, [
+        {
+          consumer: consumerName1,
+          deliveries: 1,
+        },
+      ])
+      const ids = pendingBefore.filter(p => p.consumer !== consumerName2).map(p => p.id)
+      const claimed = await consumer2.claim(ids)
+      const pendingAfter = await consumer2.pending()
+      assert.containSubset(pendingAfter, [
+        {
+          consumer: consumerName2,
+          deliveries: 1,
+        },
+      ])
+      assert.deepEqual(pendingBefore[0].created, pendingAfter[0].created)
+
+      let consumer3Count = 0
+      for await (const consumer3Received of consumer3) {
+        assert.notDeepEqual(consumer3Received, claimed[0])
+        assert.isAbove(consumer3Received[1].a, 1)
+        await consumer3.ack(consumer3Received[0])
+        consumer3Count += 1
+        if (consumer3Count === 3) {
+          break
+        }
+      }
+      const consumer2Received = await step(consumer2)
+      assert.deepEqual(consumer2Received, claimed[0])
+    })
+
+    it('should deliver messages to the last consumer to claim them', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const consumerName3 = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, consumer: consumerName2 })
+      const { consumer: consumer3 } = open({ stream, group, consumer: consumerName3 })
+      for (const a of fill(5)) {
+        await writer.write({ a })
+      }
+      await step(consumer1)
+      const pendingBefore = await consumer2.pending()
+      assert.containSubset(pendingBefore, [
+        {
+          consumer: consumerName1,
+          deliveries: 1,
+        },
+      ])
+      const ids = pendingBefore.filter(p => p.consumer !== consumerName2).map(p => p.id)
+      await consumer2.claim(ids)
+      await consumer3.claim(ids)
+
+      const consumer2Received = await step(consumer2)
+      assert.strictEqual(consumer2Received[1].a, 2)
+
+      const consumer3Received = await step(consumer3)
+      assert.strictEqual(consumer3Received[1].a, 1)
+    })
+
+    it('should consider claimed messages to still be pending before redelivery is attempted', async () => {
+      const stream = uuid()
+      const group = uuid()
+      const consumerName1 = uuid()
+      const consumerName2 = uuid()
+      const { writer, consumer: consumer1 } = open({ stream, group, consumer: consumerName1 })
+      const { consumer: consumer2 } = open({ stream, group, consumer: consumerName2 })
+      for (const a of fill(5)) {
+        await writer.write({ a })
+      }
+      await step(consumer1)
+      const pendingBefore = await consumer2.pending()
+      assert.containSubset(pendingBefore, [
+        {
+          consumer: consumerName1,
+          deliveries: 1,
+        },
+      ])
+      const ids = pendingBefore.filter(p => p.consumer !== consumerName2).map(p => p.id)
+      await consumer2.claim(ids)
+
+      const pendingAfter = await consumer2.pending()
+      assert.containSubset(pendingAfter, [
+        {
+          consumer: consumerName2,
+          deliveries: 1,
+        },
+      ])
+    })
   })
 
   describe('[Symbol.asyncIterator]()', () => {
