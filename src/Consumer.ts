@@ -4,12 +4,39 @@ import { deserialize } from './serialization'
 import { Id, listener } from './types'
 
 type Pending = {
+  /**
+   * The stream the pending message is in.
+   */
   stream: string
+
+  /**
+   * The group the pending message is in.
+   */
   group: string
+
+  /**
+   * The consumer the pending message was last delievered to.
+   */
   consumer: string
+
+  /**
+   * The id of the pending message.
+   */
   id: Id
+
+  /**
+   * The date on which the pending message was written to the stream.
+   */
   created: Date
+
+  /**
+   * The amount of time the pending message has been unacked.
+   */
   waiting: number
+
+  /**
+   * The number of times the pending message has been delivered so far.
+   */
   deliveries: number
 }
 
@@ -18,8 +45,28 @@ type SerializedPair = [Id, [never, string]]
 type DeserializedPair<T> = [Id, T]
 
 type ConsumerOptions = {
+  /**
+   * The amount of time in milliseconds which the Redis client should block before timing out.
+   * When a timeout occurs, the `Consumer` will loop back around and re-initiate a group read.
+   *
+   * Set to `'0'` to never timeout.
+   *
+   * Note that any given Redis client using a blocking operation like `XREADGROUP`
+   * will block all other commands from being issued on the same connection while it is pending.
+   */
   block?: number
+
+  /**
+   * The max number of messages to deliver for each read.
+   */
   count?: number
+
+  /**
+   * The id of the message to start consuming from.
+   *
+   * Pass `'0'` to begin from the start of the data in the stream.
+   * Pass `'$'` to begin with new messages written to the stream.
+   */
   from?: string
 }
 
@@ -64,10 +111,48 @@ class Consumer<T = any> {
   private checkBacklog: boolean = true
   private reading: boolean = false
 
-  constructor(client: IORedis.Redis, stream: string, group: string, consumer: string)
-  constructor(client: IORedis.Redis, stream: string, group: string, consumer: string, opts: ConsumerOptions)
+  /**
+   * Creates a new Consumer.
+   *
+   * @param uri The uri of the Redis server.
+   * @param stream The name of the stream to read from.
+   * @param group The name of the group to attach to.
+   * @param consumer The name of the consumer to identify as.
+   */
   constructor(uri: string, stream: string, group: string, consumer: string)
+
+  /**
+   * Creates a new Consumer.
+   *
+   * @param uri The uri of the Redis server.
+   * @param stream The name of the stream to read from.
+   * @param group The name of the group to attach to.
+   * @param consumer The name of the consumer to identify as.
+   * @param opts The options for the consumer.
+   */
   constructor(uri: string, stream: string, group: string, consumer: string, opts: ConsumerOptions)
+
+  /**
+   * Creates a new Consumer.
+   *
+   * @param client An IORedis client instance.
+   * @param stream The name of the stream to read from.
+   * @param group The name of the group to attach to.
+   * @param consumer The name of the consumer to identify as.
+   */
+  constructor(client: IORedis.Redis, stream: string, group: string, consumer: string)
+
+  /**
+   * Creates a new Consumer.
+   *
+   * @param client An IORedis client instance.
+   * @param stream The name of the stream to read from.
+   * @param group The name of the group to attach to.
+   * @param consumer The name of the consumer to identify as.
+   * @param opts The options for the consumer.
+   */
+  constructor(client: IORedis.Redis, stream: string, group: string, consumer: string, opts: ConsumerOptions)
+
   constructor(
     clientOpts: IORedis.Redis | string,
     private stream: string,
@@ -81,14 +166,25 @@ class Consumer<T = any> {
     this.from = opts.from || defaultOptions.from
   }
 
+  /**
+   * Iterates over the consumer, asynchronously yielding messages
+   * in an `[id, data]` pair.
+   */
   public [Symbol.asyncIterator]() {
     return this._iterate()
   }
 
+  /**
+   * Immediately disconnects from the wrapped Redis client.
+   */
   public disconnect() {
     this.client.disconnect()
   }
 
+  /**
+   * Allows for graceful shutdown of the consumer, setting up
+   * a disconnect to be run after pending messages can be acked.
+   */
   public shutdown() {
     this.running = false
     if (this.reading && this.block === 0) {
@@ -96,14 +192,33 @@ class Consumer<T = any> {
     }
   }
 
+  /**
+   * Attaches an event handler to the wrapped Redis client.
+   *
+   * @param eventName The name of the event to attach a handler to.
+   * @param callback The handler for the event.
+   */
   public on(name: string, callback: listener) {
     return this.client.on(name, callback)
   }
 
+  /**
+   * Acknowledges successful message delivery by id, removing the message from the pending entries list on the server.
+   *
+   * @param id The id of the message.
+   */
   public async ack(id: Id) {
     await this.client.xack(this.stream, this.group, id)
   }
 
+  /**
+   * Returns a list of pending messages for the consumer group.
+   *
+   * @param start The id to start at.
+   * @param end The id to end at.
+   * @param length The max length of pending messages to return.
+   * @returns A list of pending messages, along with their metadata.
+   */
   public async pending(start = '-', end = '+', length = 100): Promise<Pending[]> {
     try {
       const { stream, group } = this
@@ -123,7 +238,16 @@ class Consumer<T = any> {
     }
   }
 
-  public async claim(ids: Id[]) {
+  /**
+   * Claims pending messages to be re-delievered to this consumer.
+   *
+   * Noting that even though the claimed messages are returned by the server,
+   * they will still be re-delivered during normal iteration.
+   *
+   * @param ids The ids of the pending messages to claim.
+   * @returns A list of `[id, data]` pairs which were claimed.
+   */
+  public async claim(ids: Id[]): Promise<Array<DeserializedPair<T>>> {
     const MIN_IDLE_TIME = 0
     const pairs: SerializedPair[] = await this.client.xclaim(
       this.stream,
@@ -136,6 +260,11 @@ class Consumer<T = any> {
     return mapped
   }
 
+  /**
+   * Deletes the consumer from the consumer group.
+   *
+   * Any delievered but unacked messages for this consumer will be discarded from the server.
+   */
   public async deleteConsumer() {
     await this.client.xgroup('DELCONSUMER', this.stream, this.group, this.consumer)
   }
