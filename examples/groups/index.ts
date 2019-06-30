@@ -1,7 +1,7 @@
 // tslint:disable:no-console
 
-import { Writer, Consumer } from '../'
-import { sleep } from './shared'
+import { Writer, Consumer } from '../../'
+import { sleep } from '../shared'
 
 const uri = 'redis://localhost:6379'
 
