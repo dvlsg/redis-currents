@@ -1,8 +1,8 @@
 // tslint:disable:no-console
 
-import { ChildProcess, fork, ForkOptions } from 'child_process'
+import { ChildProcess } from 'child_process'
 import * as path from 'path'
-import { sleep } from '../shared'
+import { fork, sleep } from '../shared'
 
 const env = {
   STREAM: 'safe-exit-stream',
@@ -12,18 +12,13 @@ const env = {
 const startWriters = async (count = 2) => {
   console.log(`Starting ${count} writer processes`)
   const file = path.join(__dirname, 'writer.ts')
-  const args = ['-r', 'ts-node/register']
   let i = 0
   const children: ChildProcess[] = []
   while (++i <= count) {
-    const opts: ForkOptions = {
-      env: {
-        WRITER: String(i),
-        ...env,
-      },
-      silent: false,
-    }
-    const child = fork(file, args, opts)
+    const child = fork(file, {
+      WRITER: `writer-${i}`,
+      ...env,
+    })
     await sleep(500)
     children.push(child)
   }
@@ -33,18 +28,13 @@ const startWriters = async (count = 2) => {
 const startConsumers = (count = 3) => {
   console.log(`Starting ${count} consumer processes`)
   const file = path.join(__dirname, 'consumer.ts')
-  const args = ['-r', 'ts-node/register']
   let i = 0
   const children: ChildProcess[] = []
   while (++i <= count) {
-    const opts: ForkOptions = {
-      env: {
-        CONSUMER: `consumer-${i}`,
-        ...env,
-      },
-      silent: false,
-    }
-    const child = fork(file, args, opts)
+    const child = fork(file, {
+      CONSUMER: `consumer-${i}`,
+      ...env,
+    })
     children.push(child)
   }
   return children
@@ -69,8 +59,8 @@ See more here: https://nodejs.org/api/process.html#process_signal_events
   const writers = await startWriters()
   const consumers = startConsumers()
 
-  console.log(`---- Allowing processes to run for 5 seconds... ----`)
-  await sleep(5000)
+  console.log(`---- Allowing processes to run for 10 seconds... ----`)
+  await sleep(10000)
 
   console.log(`---- Sending SIGTERM to all consumers... ----`)
   consumers.forEach((consumer, i) => {
